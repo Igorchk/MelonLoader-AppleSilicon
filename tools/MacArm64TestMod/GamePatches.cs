@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 using HarmonyLib;
 using Il2CppAssets.Scripts.Unity.Scenes;
 using Il2CppAssets.Scripts.Models.Profile;

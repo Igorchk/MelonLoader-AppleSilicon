@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 using MelonLoader;
 
 [assembly: MelonInfo(typeof(MacArm64TestMod.TestMod), "MacArm64TestMod", "1.0.0", "Author")]

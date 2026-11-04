@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 using Mono.Cecil;
 
 // Rewrites an IL-only assembly as AnyCPU so CoreCLR on ARM64 will load it.

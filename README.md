@@ -49,3 +49,16 @@ Build it with `dotnet build -c Release` in `InGameModDeleter/`, which references
   - `ML_SETTLE=<seconds>` keeps the game running for longer after the mods load.
   - The Steam client must be running.
   - Unattended runs don't get past the title screen without a click.
+
+## License
+
+The code in this repository is licensed under the [Apache License 2.0](LICENSE), the same license as MelonLoader.
+
+It builds on these projects, none of which are included here:
+
+- [MelonLoader](https://github.com/LavaGang/MelonLoader) (Apache-2.0). Everything here runs on it, and the port's own changes are in the MelonLoader fork.
+- [Il2CppInterop](https://github.com/BepInEx/Il2CppInterop) (LGPL-3.0). The port's struct ABI fix is in the Il2CppInterop fork.
+- [BTD6 Mod Helper](https://github.com/gurrenm3/BTD-Mod-Helper) (GPL-3.0). InGameModDeleter compiles against it and patches it at run time, but includes none of its code. The Free Software Foundation considers Apache-2.0 compatible with GPL-3.0.
+- [Mono.Cecil](https://github.com/jbevain/cecil) (MIT). ModPatcher gets it from NuGet when it's built.
+
+No Bloons TD 6 files are in this repository. The test mod and InGameModDeleter compile against the game assemblies MelonLoader generates in your own game folder. This project isn't affiliated with Ninja Kiwi, LavaGang or the BTD6 Mod Helper authors.
