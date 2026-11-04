@@ -59,6 +59,7 @@ The loader changes live in two forks: [Igorchk/MelonLoader](https://github.com/I
 - **Correct arm64 calling conventions in Il2CppInterop.** Structs of up to 16 bytes are passed in registers, and large structs are returned through `x8`. These are AAPCS64 rules. Before the fix, `[OnDeserialized]` callbacks taking a `StreamingContext` crashed in `Object::Box`.
 - **Symbol-based hook resolution.** `GameAssembly.dylib` keeps its symbol table, so Il2CppInterop's class-injection hooks are found by mangled name, with the ASLR slide checked. Il2CppInterop's own scanner only understands x86.
 - **Guard for hooks on tiny functions.** Dobby's arm64 inline hook is 16 bytes. MelonLoader now refuses to hook game functions smaller than that, instead of overwriting the next function. Without the guard, BTD6 Mod Helper's patch on the 12-byte `Btd6Player.Save` corrupted `Btd6Player.Sync` and the game died with `SIGILL` at the first round end.
+- **Guard for hooks that cross a page boundary.** Dobby's macOS code patcher only writes the one memory page where a patch starts, so a 16-byte patch running into the next page crashed the game (`SIGSEGV` in `memmove`; AbilityChoice hit this on every launch). MelonLoader refuses those hooks too.
 - **Steam-safe launcher.** Steam starts launch options from an x86_64 (Rosetta) process tree. The launcher starts the game with `arch -arm64` and passes `DYLD_*` with `arch -e`, because SIP strips those variables from protected binaries.
 
 ## Prerequisites
@@ -84,17 +85,10 @@ export BTD6="$HOME/Library/Application Support/Steam/steamapps/common/BloonsTD6"
 
 ### 1. Get the loader
 
-**Option A: release zip.** Download `MelonLoader-macOS-arm64-v0.7.4-hotfix4.zip` from [PLACEHOLDER: release URL] and extract it into the game folder. It already contains the patched Il2CppInterop DLLs.
+**Option A: release zip.** Download `MelonLoader-macOS-arm64-v0.7.4-hotfix5.zip` from the [hotfix5 release](https://github.com/Igorchk/MelonLoader-AppleSilicon/releases/tag/v0.7.4-hotfix5) and extract it into the game folder. It already contains the patched Il2CppInterop DLLs and the auto-patching launcher.
 
 ```bash
-unzip MelonLoader-macOS-arm64-v0.7.4-hotfix4.zip -d "$BTD6"
-```
-
-hotfix4's `melonloader-launch.sh` predates the auto-patch step. For automatic patching, replace it with the one from the fork:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Igorchk/MelonLoader/macos-arm64-support/MelonLoader.Bootstrap/OSXEntry/melonloader-launch.sh -o "$BTD6/melonloader-launch.sh"
-chmod +x "$BTD6/melonloader-launch.sh"
+unzip MelonLoader-macOS-arm64-v0.7.4-hotfix5.zip -d "$BTD6"
 ```
 
 **Option B: build from source.**
@@ -219,7 +213,7 @@ flowchart TD
     Game --> Bootstrap["MelonLoader.Bootstrap.dylib<br/>(NativeAOT, DYLD_INTERPOSE)"]
     Bootstrap --> Runtime[".NET 6 runtime (arm64)"]
     Runtime --> ML["MelonLoader"]
-    ML --> Symbols["Mach-O symbol resolver<br/>+ short-hook guard"]
+    ML --> Symbols["Mach-O symbol resolver<br/>+ hook guards"]
     ML --> Interop["Il2CppInterop<br/>(AAPCS64 trampolines)"]
     Symbols --> Dobby["Dobby inline hooks"]
     Interop --> GA["GameAssembly.dylib (Il2Cpp)"]
@@ -239,7 +233,7 @@ flowchart TD
   - It reads `LC_SYMTAB` from every instruction section in `__TEXT`, including Unity 6's separate `__TEXT,il2cpp` section of generated game code. Every offset is bounds-checked.
   - It computes the ASLR slide from two exports.
   - It resolves Il2CppInterop's hook targets by name, following single-`b` thunks.
-  - Every native hook first measures its target, and refuses functions smaller than Dobby's 16-byte patch.
+  - Every native hook first measures its target, and refuses functions smaller than Dobby's 16-byte patch, and patches that would cross a page boundary.
 - **User toolchain** (this repository):
   - `patch_mac_mods.sh` drives `ModPatcher`.
   - InGameModDeleter uses a Harmony postfix on Mod Helper's internal `ModsMenu.SetSelectedMod`. It reaches `ModHelperData` through Mod Helper's own assembly, because the Updater Plugin ships a partial copy of that type under the same name.
@@ -257,6 +251,7 @@ flowchart TD
 - **Deleted mods stay loaded until a restart.** The .NET runtime can't unload an assembly from the default `AssemblyLoadContext`, so a mod deleted in game keeps running until the game closes. The in-game message attributes this to Unity, but the limit comes from .NET.
 - **Mod Helper's mod browser installs x64 builds.** Downloaded mods only load after `patch_mac_mods.sh` has run, which the launcher does on the next start.
 - **Game functions under 16 bytes can't be hooked from game code.** MelonLoader refuses those hooks and logs `Refusing to patch … because it is too small for an ARM64 detour`. In BTD6, this affects Mod Helper's patch on the 12-byte `Btd6Player.Save`, and a patch on the 4-byte `EditorMenuPopout.OnPlaceablesPlacedOrRemoved` that appears once Useful Utilities is installed. Calls from mods still reach those patches; calls from the game run the original. Dobby's near-branch mode isn't a fix, because on macOS it reused zero-filled pages inside Il2Cpp's GC heap.
+- **Hooks that would cross a memory page boundary are refused the same way**, logged as `Refusing to patch … because its ARM64 detour would cross a memory page boundary`. With AbilityChoice 4.5.0 this affects one hook. The real fix belongs in Dobby's macOS code patcher.
 - **Tiered compilation is off** on osx-arm64, so the JIT can't replace Harmony detours. Startup JIT is slower. The underlying mechanism is inferred, not proven.
 - **Patched methods can't return structs larger than 16 bytes.** Harmony can't bind the fixed-size struct type for such a return, so the patch fails with `FileLoadException`.
 - **No xref cache on arm64.** Il2CppInterop's xref scanner only decodes x86, so mods that use `XrefScanner` at run time won't work.
