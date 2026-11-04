@@ -24,6 +24,18 @@ It runs the patcher in `ModPatcher/` on the .NET runtime that MelonLoader downlo
 cd ModPatcher && dotnet build -c Release -o bin
 ```
 
+The `macos-arm64-support` branch of the MelonLoader fork runs this script automatically from `melonloader-launch.sh` before every launch.
+
+## InGameModDeleter
+
+A MelonLoader mod that adds a delete button for **loaded** mods to BTD6 Mod Helper's Mods menu. Mod Helper's own delete button only appears for mods that are disabled and weren't loaded this session.
+
+- The red ✕ sits one slot left of the Settings gear in the selected mod's button row. It's hidden for Mod Helper itself.
+- After you confirm, it deletes the mod's file and Mod Helper's cached info for it. The mod keeps running until the game restarts.
+- It relies on Mod Helper 3.6.10 internals (`ModsMenu.SetSelectedMod`, `ModHelperData`). If a later version renames them, it logs which one is missing and the button doesn't appear.
+
+Build it with `dotnet build -c Release` in `InGameModDeleter/`, which references the game folder's MelonLoader, `Il2CppAssemblies` and `Mods/Btd6ModHelper.dll`. Then copy `bin/Release/net6.0/InGameModDeleter.dll` into `Mods/`.
+
 ## tools/
 
 - `MacArm64TestMod/` is a test mod that exercises the port:
