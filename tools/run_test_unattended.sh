@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Unattended MelonLoader test run for Bloons TD 6 on macOS.
 #
 # Launches the game through melonloader-launch.sh with no terminal and no stdin, watches

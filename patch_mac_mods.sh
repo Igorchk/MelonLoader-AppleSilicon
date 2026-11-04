@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 #
 # Rewrites x64-only MelonLoader mods in BloonsTD6/Mods as AnyCPU, so the .NET runtime
 # on Apple Silicon will load them.
