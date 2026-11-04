@@ -14,6 +14,9 @@
 # Each patched file's original is copied to BloonsTD6/ModPatcher-backups/<timestamp>/
 # first. Run it again after installing or updating mods; files that are already AnyCPU
 # are skipped.
+#
+# Paths in the output show the home folder as ~, so logs, screenshots and recordings
+# don't reveal the macOS account name.
 
 set -u
 
@@ -24,7 +27,20 @@ GAME_DIR="${BTD6_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/B
 MODS_DIR="${1:-$GAME_DIR/Mods}"
 ML_DIR="$GAME_DIR/MelonLoader"
 
-die() { echo "error: $*" >&2; exit 1; }
+# A path for display, with a leading home folder shown as ~
+show_path() {
+    if [[ "$1" == "$HOME"/* || "$1" == "$HOME" ]]; then
+        printf '~%s' "${1#"$HOME"}"
+    else
+        printf '%s' "$1"
+    fi
+}
+
+# The same for free text, such as the patcher's error output
+HOME_PATTERN="$(printf '%s' "$HOME" | sed 's/[][\.*^$|/]/\\&/g')"
+hide_home() { sed "s/$HOME_PATTERN/~/g"; }
+
+die() { echo "error: $*" | hide_home >&2; exit 1; }
 
 [ -d "$MODS_DIR" ] || die "mods folder not found: $MODS_DIR"
 [ -f "$PATCHER" ] || die "patcher not built: $PATCHER (build ModPatcher with: dotnet build -c Release -o bin)"
@@ -79,7 +95,7 @@ for dll in "$MODS_DIR"/*.dll; do
 
     if [ $rc -eq 0 ] && [[ "$(file -b "$tmp")" == *"Intel 80386 Mono/.Net assembly"* ]]; then
         mv -f "$tmp" "$dll"
-        echo "PATCH  $name (x64 -> AnyCPU, original in $BACKUP_DIR)"
+        echo "PATCH  $name (x64 -> AnyCPU)"
         patched=$((patched + 1))
     elif [ $rc -eq 2 ]; then
         rm -f "$tmp" "$BACKUP_DIR/$name"
@@ -88,7 +104,7 @@ for dll in "$MODS_DIR"/*.dll; do
     else
         rm -f "$tmp"
         echo "FAIL   $name (left untouched)"
-        echo "$output" | sed 's/^/         /'
+        echo "$output" | hide_home | sed 's/^/         /'
         failed=$((failed + 1))
     fi
 done
@@ -96,4 +112,7 @@ done
 rmdir "$BACKUP_DIR" "$GAME_DIR/ModPatcher-backups" 2>/dev/null
 echo
 echo "$patched patched, $skipped skipped, $failed failed"
+if [ $patched -gt 0 ]; then
+    echo "Originals backed up to $(show_path "$BACKUP_DIR")"
+fi
 [ $failed -eq 0 ]
