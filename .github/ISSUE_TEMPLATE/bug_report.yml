@@ -1,0 +1,66 @@
+name: Bug report
+description: Something's broken on Apple Silicon
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, check the [Known Issues & Limitations](https://github.com/Igorchk/MelonLoader-AppleSilicon#known-issues--limitations)
+        section of the README - several things (methods under 16 bytes, hooks crossing a page
+        boundary, structs over 16 bytes returned from a patch, deleted mods staying loaded until
+        restart) are already documented there, not bugs in this report's sense.
+
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Apple Silicon chip
+      options:
+        - M1
+        - M2
+        - M3
+        - M4
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: The exact version, e.g. 14.5 or 15.0 (Apple menu > About This Mac)
+      placeholder: "15.0"
+    validations:
+      required: true
+
+  - type: input
+    id: btd6-version
+    attributes:
+      label: Bloons TD 6 version
+      description: Shown in the game's main menu, or in Steam > Properties > Installed Files
+      placeholder: "57.4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description and steps to reproduce
+      description: What happened, what you expected instead, and the exact steps to reproduce it
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: MelonLoader/Latest.log
+      description: >
+        Required. Paste the full contents of MelonLoader/Latest.log from your BTD6 folder, or a
+        link to a Pastebin/Gist with it. Reports without this will be closed - the log is almost
+        always where the actual error is.
+      placeholder: Paste the log contents here, or a Pastebin/Gist link
+      render: text
+    validations:
+      required: true
