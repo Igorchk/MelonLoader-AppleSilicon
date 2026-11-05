@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scripts this repo owns. ubuntu-latest images ship shellcheck preinstalled.
+      - name: Lint patch_mac_mods.sh and the test harness
+        run: shellcheck patch_mac_mods.sh tools/run_test_unattended.sh
+
+      # melonloader-launch.sh itself lives in the MelonLoader fork, not here, but this repo's
+      # auto-patch step (README "Installation & Setup", option A) assumes its shape, so lint the
+      # current version too. Informational only: a finding here is the fork's to fix, not a
+      # reason to fail this repo's CI.
+      - name: Lint the fork's launcher (informational)
+        continue-on-error: true
+        run: |
+          curl -fsSL -o /tmp/melonloader-launch.sh \
+            https://raw.githubusercontent.com/Igorchk/MelonLoader/macos-arm64-support/MelonLoader.Bootstrap/OSXEntry/melonloader-launch.sh
+          shellcheck /tmp/melonloader-launch.sh
+
+  dotnet:
+    name: .NET build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.0.x"
+
+      # ModPatcher (cecilpatch) only depends on Mono.Cecil from NuGet, so it builds anywhere.
+      - name: Build ModPatcher
+        run: dotnet build ModPatcher/cecilpatch.csproj -c Release
+
+      # InGameModDeleter references MelonLoader.dll, 0Harmony.dll, Il2CppInterop's DLLs, BTD6 Mod
+      # Helper's DLL, and the Il2Cpp assemblies MelonLoader generates from a real BTD6 install
+      # (see InGameModDeleter.csproj's $(GameDir) HintPaths). None of that exists, or can be
+      # legally redistributed, on a hosted runner - this repo ships no BTD6 or Mod Helper files
+      # (see README's Contributing & License section). So this step is expected to fail with
+      # unresolved-reference errors; it's kept non-blocking so it still shows the real compiler
+      # errors if someone changes code in a way that would also break a real local build.
+      # Build InGameModDeleter locally against your own game folder instead (README "Install this
+      # toolchain"): (cd InGameModDeleter && dotnet build -c Release)
+      - name: Build InGameModDeleter (expected to fail without a local BTD6 + Mod Helper install)
+        continue-on-error: true
+        run: dotnet build InGameModDeleter/InGameModDeleter.csproj -c Release

@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package release zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.0.x"
+
+      - name: Stage the toolchain
+        run: |
+          set -e
+          mkdir -p stage
+          cp patch_mac_mods.sh README.md LICENSE stage/
+          chmod +x stage/patch_mac_mods.sh
+
+      # ModPatcher only depends on NuGet's Mono.Cecil, so it builds on a stock runner. Output
+      # straight to ModPatcher/bin under the staging dir, matching the relative path
+      # patch_mac_mods.sh expects ($SCRIPT_DIR/ModPatcher/bin/cecilpatch.dll).
+      - name: Build ModPatcher
+        run: dotnet build ModPatcher/cecilpatch.csproj -c Release -o stage/ModPatcher/bin
+
+      # melonloader-launch.sh lives in the MelonLoader fork, not this repo; fetch the current one
+      # so the zip is a complete drop-in toolchain.
+      - name: Fetch the launcher from the MelonLoader fork
+        run: |
+          curl -fsSL -o stage/melonloader-launch.sh \
+            https://raw.githubusercontent.com/Igorchk/MelonLoader/macos-arm64-support/MelonLoader.Bootstrap/OSXEntry/melonloader-launch.sh
+          chmod +x stage/melonloader-launch.sh
+
+      # InGameModDeleter needs a real BTD6 + MelonLoader + Mod Helper install to resolve its
+      # references (see build.yml's dotnet job for why) - none of that exists on this runner, so
+      # this is expected to fail. Kept non-blocking; if it ever does succeed here, the DLL is
+      # picked up into the release automatically, otherwise the zip just ships without it, same
+      # as it does today.
+      - name: Build InGameModDeleter (expected to fail without a local BTD6 + Mod Helper install)
+        id: ingamemoddeleter
+        continue-on-error: true
+        run: dotnet build InGameModDeleter/InGameModDeleter.csproj -c Release -o stage/Mods
+
+      - name: Drop the Mods folder if InGameModDeleter didn't build
+        if: steps.ingamemoddeleter.outcome != 'success'
+        run: rm -rf stage/Mods
+
+      - name: Zip the release
+        run: |
+          cd stage
+          zip -rX ../MelonLoader-macOS-arm64-release.zip .
+
+      - name: Create/update the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MelonLoader-macOS-arm64-release.zip
+          generate_release_notes: true

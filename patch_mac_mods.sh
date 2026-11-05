@@ -59,6 +59,7 @@ fi
 # Cecil resolves referenced assemblies while writing, e.g. to encode enum-typed default
 # parameter values, so give it everything a mod can reference
 REF_DIRS=("$MODS_DIR" "$GAME_DIR/UserLibs" "$GAME_DIR/Plugins" "$ML_DIR/net6" "$ML_DIR/Il2CppAssemblies")
+# shellcheck disable=SC2012 # version-sorting directory names needs ls -d; find has no equivalent here
 FRAMEWORK_DIR="$(ls -d "$ML_DIR"/Dependencies/dotnet/shared/Microsoft.NETCore.App/*/ 2>/dev/null | sort -V | tail -1)"
 [ -n "$FRAMEWORK_DIR" ] && REF_DIRS+=("${FRAMEWORK_DIR%/}")
 EXISTING_REF_DIRS=()

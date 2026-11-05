@@ -62,6 +62,7 @@ while (( t < TIMEOUT )); do
     fi
 
     # MelonLoader rotates the previous run's Latest.log into Logs/, so ignore it until it's rewritten
+    # shellcheck disable=SC2015 # intentional guard clause: both "missing" and "stale" fall through to continue
     [ -f "$LOG" ] && (( $(stat -f %m "$LOG") >= START )) || continue
     TEXT=$(strip_log)
 
