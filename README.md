@@ -40,6 +40,7 @@ The loader changes live in two forks: [Igorchk/MelonLoader](https://github.com/I
 - [Installation & Setup](#installation--setup)
 - [Usage](#usage)
 - [Architecture Overview](#architecture-overview)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
 - [Known Issues & Limitations](#known-issues--limitations)
 - [Contributing & License](#contributing--license)
 
@@ -245,6 +246,34 @@ flowchart TD
 | `InGameModDeleter/` | MelonLoader mod adding the live-delete button to Mod Helper's Mods menu |
 | `tools/MacArm64TestMod/` | Probe mod for lifecycle, Harmony, struct ABI and short-hook checks |
 | `tools/run_test_unattended.sh` | Headless launch-and-check harness |
+
+## Troubleshooting & FAQ
+
+**"[App] is damaged and can't be opened. You should move it to the Trash" (Gatekeeper).**
+macOS tags anything downloaded from the internet, including a cloned repo or an extracted zip,
+with a `com.apple.quarantine` extended attribute. Gatekeeper then refuses to run the unsigned or
+ad-hoc-signed binaries in it (`BloonsTD6.app`, `MelonLoader.Bootstrap.dylib`, the patcher's
+`cecilpatch.dll`), reporting them as "damaged" rather than "unsigned." Strip the attribute
+recursively from the folder and try again:
+
+```bash
+xattr -cr /path/to/your/Mods/or/game/folder
+```
+
+Run it on the BTD6 game folder (`$BTD6` in the commands above) after extracting a release zip or
+re-signing the app, and on `Mods/` after downloading new mods, if either still won't launch.
+
+**`FileLoadException` (`0x80131621`) - a mod won't load.**
+BTD6 Mod Helper's mod browser, and most mods in it, are built `PlatformTarget=x64` for Windows.
+The arm64 .NET runtime on Apple Silicon refuses to load an x64-targeted assembly outright, even
+when it's pure IL - that's this exception. It means the mod hasn't been patched to `AnyCPU` yet.
+
+- If you're launching through Steam with the toolchain installed (see [Installation & Setup](#installation--setup)), this should already be automatic: `melonloader-launch.sh` runs `patch_mac_mods.sh` before every launch. Check `MelonLoader/AutoPatch.log` for why a specific mod wasn't patched.
+- Otherwise, run the patcher by hand with the game closed:
+  ```bash
+  ~/Documents/Coding/BTD6-Mods/MelonLoader-AppleSilicon/patch_mac_mods.sh
+  ```
+- If it still fails after patching, check the exception's inner message in `MelonLoader/Latest.log` - the mod may contain actual native (non-IL) code, which patching can't fix.
 
 ## Known Issues & Limitations
 
