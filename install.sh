@@ -118,13 +118,15 @@ mkdir -p "$GAME_DIR/Mods"
 
 # ---- toolchain (patch_mac_mods.sh + ModPatcher) -----------------------------
 
-if [ -d "$TOOLCHAIN_DIR/.git" ]; then
-    echo "Updating toolchain in $TOOLCHAIN_DIR..."
-    git -C "$TOOLCHAIN_DIR" pull --ff-only || echo "warning: couldn't update the existing toolchain checkout, continuing with what's there" >&2
-else
+if [ ! -e "$TOOLCHAIN_DIR" ]; then
     echo "Cloning toolchain into $TOOLCHAIN_DIR..."
     mkdir -p "$(dirname "$TOOLCHAIN_DIR")"
     git clone "https://github.com/$REPO_SLUG.git" "$TOOLCHAIN_DIR" || die "Couldn't clone the toolchain repository. Check your internet connection and try again."
+elif [ -d "$TOOLCHAIN_DIR/.git" ]; then
+    echo "Updating toolchain in $TOOLCHAIN_DIR..."
+    git -C "$TOOLCHAIN_DIR" pull --ff-only || echo "warning: couldn't update the existing toolchain checkout, continuing with what's there" >&2
+else
+    echo "warning: $TOOLCHAIN_DIR already exists but isn't a git checkout; leaving it as-is" >&2
 fi
 
 if [ ! -f "$TOOLCHAIN_DIR/ModPatcher/bin/cecilpatch.dll" ]; then
@@ -148,14 +150,20 @@ if [ -f "$GAME_ASSEMBLY" ] && ! lipo -info "$GAME_ASSEMBLY" 2>/dev/null | grep -
     mv "$thin_tmp" "$GAME_ASSEMBLY"
 fi
 
-echo "Re-signing the app bundle..."
-codesign --force --deep --sign - "$GAME_DIR/BloonsTD6.app" || die "Couldn't re-sign BloonsTD6.app."
-
 # ---- fetch and extract the latest MelonLoader release -----------------------
 
 echo "Checking the latest release..."
-release_json="$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO_SLUG/releases/latest")" \
-    || die "Couldn't reach GitHub to check the latest release. Check your internet connection and try again."
+auth_header=()
+[ -n "${GITHUB_TOKEN:-}" ] && auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
+api_response="$(curl -sS -w '\n%{http_code}' -H "Accept: application/vnd.github+json" "${auth_header[@]}" "https://api.github.com/repos/$REPO_SLUG/releases/latest")"
+http_code="${api_response##*$'\n'}"
+release_json="${api_response%$'\n'*}"
+if [ "$http_code" != "200" ]; then
+    if printf '%s' "$release_json" | grep -qi "rate limit"; then
+        die "GitHub is rate-limiting requests from this network right now (unauthenticated requests are capped at 60/hour). Wait a few minutes and run the installer again, or set a GITHUB_TOKEN environment variable to raise the limit."
+    fi
+    die "Couldn't reach GitHub to check the latest release (HTTP $http_code). Check your internet connection and try again."
+fi
 
 zip_url="$(printf '%s\n' "$release_json" \
     | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*MelonLoader-macOS-arm64-v[^"]*\.zip"' \
@@ -222,6 +230,16 @@ exec "\$DIR/${BINARY_NAME}_original" "\$@"
 WRAPPER
 chmod +x "$wrapper_tmp"
 mv "$wrapper_tmp" "$MACOS_DIR/$BINARY_NAME"
+
+# Signed last, now that the wrapper is the bundle's main executable: codesign
+# resolves Contents/MacOS/$BINARY_NAME from Info.plist, so signing any earlier
+# (while it was still the real, Mach-O game binary) gets thrown away the moment
+# that file is renamed out from under it - the bundle would seal a path that no
+# longer holds a signable binary. --deep still signs BloonsTD6_original (now a
+# nested executable) with its own ad-hoc signature, which is what actually
+# matters for .NET's allow-jit requirement once the wrapper execs it.
+echo "Re-signing the app bundle..."
+codesign --force --deep --sign - "$GAME_DIR/BloonsTD6.app" || die "Couldn't re-sign BloonsTD6.app."
 
 gui_note "BTD6 Mac Mod Installer" "Installation Complete! You can now launch BTD6 directly from Steam."
 echo "Done."
