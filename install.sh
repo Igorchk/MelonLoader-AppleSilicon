@@ -31,6 +31,13 @@ tmp_zip=""
 cleanup() { [ -n "$tmp_zip" ] && rm -f "$tmp_zip"; }
 trap cleanup EXIT
 
+# Mask the home folder as ~ in everything this script prints from here on -
+# including output from git/dotnet/codesign, not just our own echo lines - so a
+# terminal transcript pasted into a bug report doesn't carry the macOS account
+# name (same reason patch_mac_mods.sh does this for its own output).
+HOME_PATTERN="$(printf '%s' "$HOME" | sed 's/[][\.*^$|/]/\\&/g')"
+exec > >(sed "s/$HOME_PATTERN/~/g") 2>&1
+
 # ---- native dialogs -------------------------------------------------------
 
 as_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
@@ -147,7 +154,7 @@ if [ -f "$GAME_ASSEMBLY" ] && ! lipo -info "$GAME_ASSEMBLY" 2>/dev/null | grep -
     echo "Thinning GameAssembly.dylib to arm64..."
     thin_tmp="$(mktemp "${TMPDIR:-/tmp}/GameAssembly.XXXXXX")"
     lipo -thin arm64 "$GAME_ASSEMBLY" -output "$thin_tmp" || die "Couldn't thin GameAssembly.dylib to arm64."
-    mv "$thin_tmp" "$GAME_ASSEMBLY"
+    mv "$thin_tmp" "$GAME_ASSEMBLY" || die "Couldn't thin GameAssembly.dylib to arm64."
 fi
 
 # ---- fetch and extract the latest MelonLoader release -----------------------
@@ -239,8 +246,8 @@ fi
 
 exec "\$DIR/$ORIGINAL_NAME" "\$@"
 WRAPPER
-chmod +x "$wrapper_tmp"
-mv "$wrapper_tmp" "$MACOS_DIR/$BINARY_NAME"
+chmod +x "$wrapper_tmp" || die "Couldn't make the MelonLoader wrapper executable."
+mv "$wrapper_tmp" "$MACOS_DIR/$BINARY_NAME" || die "Couldn't install the MelonLoader wrapper."
 
 # Signed last, now that the wrapper is the bundle's main executable: codesign
 # resolves Contents/MacOS/$BINARY_NAME from Info.plist, so signing any earlier
