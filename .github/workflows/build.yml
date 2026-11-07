@@ -17,8 +17,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # Scripts this repo owns. ubuntu-latest images ship shellcheck preinstalled.
-      - name: Lint patch_mac_mods.sh and the test harness
-        run: shellcheck patch_mac_mods.sh tools/run_test_unattended.sh
+      - name: Lint patch_mac_mods.sh, install.sh and the test harness
+        run: shellcheck patch_mac_mods.sh install.sh tools/run_test_unattended.sh
 
       # melonloader-launch.sh itself lives in the MelonLoader fork, not here, but this repo's
       # auto-patch step (README "Installation & Setup", option A) assumes its shape, so lint the

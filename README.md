@@ -38,6 +38,8 @@ The loader changes live in two forks: [Igorchk/MelonLoader](https://github.com/I
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation & Setup](#installation--setup)
+  - [Quick install (recommended)](#quick-install-recommended)
+  - [Manual installation (advanced / build from source)](#manual-installation-advanced--build-from-source)
 - [Usage](#usage)
 - [Architecture Overview](#architecture-overview)
 - [Troubleshooting & FAQ](#troubleshooting--faq)
@@ -78,7 +80,19 @@ The loader changes live in two forks: [Igorchk/MelonLoader](https://github.com/I
 
 ## Installation & Setup
 
-The commands below assume the default Steam library:
+### Quick install (recommended)
+
+One command does everything below: finds your BloonsTD6 install (or lets you pick the folder), clones and builds the patcher toolchain, thins and re-signs the game bundle, downloads and extracts the latest MelonLoader + Il2CppInterop release, clears the Gatekeeper quarantine flag, and swaps in a launcher wrapper so the game loads mods straight from Steam - **no Steam Launch Option to set by hand**. Status is shown as native macOS dialogs as well as in the terminal.
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Igorchk/MelonLoader-AppleSilicon/main/install.sh)"
+```
+
+It's safe to re-run: each step is skipped if it's already done, and the original app is backed up to `~/BloonsTD6.app.orig` before anything is changed. A Steam update or **Verify integrity of game files** restores the stock app and undoes the swap - just run the command again afterwards. Read `install.sh` before running it, same as with any script piped into `bash`.
+
+### Manual installation (advanced / build from source)
+
+Prefer to see every step, or need to build from source instead of the release zip? The commands below assume the default Steam library:
 
 ```bash
 export BTD6="$HOME/Library/Application Support/Steam/steamapps/common/BloonsTD6"
@@ -127,6 +141,8 @@ codesign --force --deep --sign - BloonsTD6.app
 A Steam update, or **Verify integrity of game files**, restores the original app. Repeat this step afterwards.
 
 ### 3. Set the Steam launch option
+
+(Skip this if you used the quick installer above - it swaps the game binary itself instead, so no Launch Option is needed.)
 
 In Steam, open Bloons TD 6 → **Properties** → **General** → **Launch Options**, and enter the launcher's absolute path, quoted:
 
