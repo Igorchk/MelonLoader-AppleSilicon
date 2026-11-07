@@ -153,9 +153,14 @@ fi
 # ---- fetch and extract the latest MelonLoader release -----------------------
 
 echo "Checking the latest release..."
-auth_header=()
-[ -n "${GITHUB_TOKEN:-}" ] && auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
-api_response="$(curl -sS -w '\n%{http_code}' -H "Accept: application/vnd.github+json" "${auth_header[@]}" "https://api.github.com/repos/$REPO_SLUG/releases/latest")"
+# No array here: macOS ships bash 3.2 as /bin/bash (last GPLv2 release), where
+# "${arr[@]}" on a zero-element array is itself an unbound-variable error under
+# set -u, even with the quotes.
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+    api_response="$(curl -sS -w '\n%{http_code}' -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$REPO_SLUG/releases/latest")"
+else
+    api_response="$(curl -sS -w '\n%{http_code}' -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO_SLUG/releases/latest")"
+fi
 http_code="${api_response##*$'\n'}"
 release_json="${api_response%$'\n'*}"
 if [ "$http_code" != "200" ]; then
@@ -189,10 +194,16 @@ xattr -cr "$GAME_DIR" || true
 
 MACOS_DIR="$GAME_DIR/BloonsTD6.app/Contents/MacOS"
 BINARY_NAME="$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$GAME_DIR/BloonsTD6.app/Contents/Info.plist" 2>/dev/null || echo BloonsTD6)"
+# Kept short deliberately: MelonLoader asks Cpp2IL for the game's exe name via
+# .NET's Process.ProcessName, which macOS/Linux truncate to 15 chars (the
+# kernel's MAXCOMLEN). "${BINARY_NAME}_original" (18 chars for BloonsTD6) would
+# come back truncated to a name matching no file on disk, and MelonLoader would
+# fail to find the game - this suffix has to keep the total at 15 chars or under.
+ORIGINAL_NAME="${BINARY_NAME}_orig"
 
-if [ ! -f "$MACOS_DIR/${BINARY_NAME}_original" ]; then
+if [ ! -f "$MACOS_DIR/$ORIGINAL_NAME" ]; then
     echo "Swapping $BINARY_NAME for the MelonLoader wrapper..."
-    mv "$MACOS_DIR/$BINARY_NAME" "$MACOS_DIR/${BINARY_NAME}_original" || die "Couldn't rename the game binary."
+    mv "$MACOS_DIR/$BINARY_NAME" "$MACOS_DIR/$ORIGINAL_NAME" || die "Couldn't rename the game binary."
 fi
 
 wrapper_tmp="$(mktemp "${TMPDIR:-/tmp}/btd6-wrapper.XXXXXX")"
@@ -223,10 +234,10 @@ if [ -f "\$BOOTSTRAP" ]; then
     exec /usr/bin/arch -arm64 \\
         -e "DYLD_INSERT_LIBRARIES=\$DYLD_INSERT_LIBRARIES" \\
         -e "DYLD_LIBRARY_PATH=\$DYLD_LIBRARY_PATH" \\
-        "\$DIR/${BINARY_NAME}_original" "\$@"
+        "\$DIR/$ORIGINAL_NAME" "\$@"
 fi
 
-exec "\$DIR/${BINARY_NAME}_original" "\$@"
+exec "\$DIR/$ORIGINAL_NAME" "\$@"
 WRAPPER
 chmod +x "$wrapper_tmp"
 mv "$wrapper_tmp" "$MACOS_DIR/$BINARY_NAME"
@@ -235,7 +246,7 @@ mv "$wrapper_tmp" "$MACOS_DIR/$BINARY_NAME"
 # resolves Contents/MacOS/$BINARY_NAME from Info.plist, so signing any earlier
 # (while it was still the real, Mach-O game binary) gets thrown away the moment
 # that file is renamed out from under it - the bundle would seal a path that no
-# longer holds a signable binary. --deep still signs BloonsTD6_original (now a
+# longer holds a signable binary. --deep still signs $ORIGINAL_NAME (now a
 # nested executable) with its own ad-hoc signature, which is what actually
 # matters for .NET's allow-jit requirement once the wrapper execs it.
 echo "Re-signing the app bundle..."
