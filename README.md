@@ -202,6 +202,16 @@ You can also run the patcher by hand, with the game closed:
 
 It only rewrites .NET assemblies that `file` reports as x86-64, and skips everything else. It exits non-zero if any patch failed.
 
+### Vanilla / Modded Toggle
+
+Co-Op and other online modes can flag an account for running a modded client. `toggle_mods.sh` switches the next launch between modded and a clean, unmodified vanilla client, so you can play online safely and switch back afterward:
+
+```bash
+~/Documents/Coding/BTD6-Mods/MelonLoader-AppleSilicon/toggle_mods.sh
+```
+
+It shows the current status in a dialog (**VANILLA** or **MODDED**) with a button to switch. In vanilla mode, the launch wrapper skips both the mod patcher and the MelonLoader injection entirely - it's the unmodified game binary, nothing else running.
+
 ### In-game mod deletion
 
 1. On the main menu, open Mod Helper's **Mods** menu.
